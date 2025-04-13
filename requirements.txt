@@ -4,5 +4,5 @@ argparse
 torch
 matplotlib
 gdown
-numpy==2.2.4
+numpy==1.24.4
 
