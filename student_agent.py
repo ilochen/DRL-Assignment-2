@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import copy
 import math
 import random
-import itertools
 from collections import defaultdict
 import gdown
 
@@ -308,7 +307,7 @@ class SymmetricNTupleNetwork:
 import os
 
 # Download the file only if not already downloaded
-file_id = "1gQBr_E1KlJHxf1iX3QPGuDb4-PHC7n4G"
+file_id = "1iGqbtN_PT5uH3ryH_H5w2w1EvJmFg4Ft"
 output_path = "ntuple_network_55299.pkl"
 
 if not os.path.exists(output_path):
