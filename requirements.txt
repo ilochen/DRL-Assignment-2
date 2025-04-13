@@ -3,7 +3,6 @@ requests
 argparse
 torch
 matplotlib
-pickle
 gdown
-numpy
+numpy==2.2.4
 
