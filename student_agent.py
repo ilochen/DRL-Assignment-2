@@ -10,7 +10,7 @@ import math
 import random
 from collections import defaultdict
 import gdown
-
+import gc
 
 class Game2048Env(gym.Env):
     def __init__(self):
@@ -330,13 +330,17 @@ import os
 #         [(1, 0), (2, 0), (3, 0), (3, 1), (3, 2), (2, 2)],
 #         [(1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (2, 3)],
 #     ]
-approximator = SymmetricNTupleNetwork()
-print("start_log")
-approximator.load("converted_weights.pkl")
-    
+approximator = None
 def get_action(state, score):
     print("1")
     global approximator
+    def init_model():
+        if approximator is None:
+            gc.collect()
+            approximator = SymmetricNTupleNetwork()
+            print("load model")
+            approximator.load("converted_weights.pkl")
+            print("load model done")
     env = Game2048Env()
     env.board = state.copy()
     env.score = score
