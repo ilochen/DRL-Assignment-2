@@ -27,7 +27,7 @@ jobs:
       run: |
         pip install gym
         pip install -r requirements.txt
-        gdown --fuzzy https://drive.google.com/uc?id=1stLf9NqvkkmUTqvPe9dSREO0KfMAlN0s
+        gdown --fuzzy https://drive.google.com/file/d/1iGqbtN_PT5uH3ryH_H5w2w1EvJmFg4Ft/view?usp=share_link
 
     - name: 3. Ensure env.so is executable
       run: chmod +x env.cpython-38-x86_64-linux-gnu.so

@@ -235,7 +235,7 @@ class Game2048Env(gym.Env):
 
 
 class SymmetricNTupleNetwork:
-    def __init__(self, tuple_shapes, num_values=15):
+    def __init__(self, tuple_shapes = [], num_values=15):
         self.num_values = num_values
         self.tuple_shapes = tuple_shapes
         self.symmetry_tuples = self._generate_all_symmetric_tuples(tuple_shapes)
@@ -267,11 +267,13 @@ class SymmetricNTupleNetwork:
         return sym_tuples
 
     def get_index(self, board, tuple_indices):
-        value = 0
-        for idx in tuple_indices:
-            x, y = idx
-            value = value * self.num_values + self.encode(board[x][y])
-        return value
+        # value = 0
+        # for idx in tuple_indices:
+        #     x, y = idx
+        #     value = value * self.num_values + self.encode(board[x][y])
+        # return value
+        index = tuple(self.encode(board[x][y]) for x, y in tuple_indices)
+        return index
 
     def value(self, board):
         val = 0
@@ -318,250 +320,255 @@ import os
 #     gdown.download(f"https://drive.google.com/uc?id={file_id}", output_path, quiet=False)
 #     print(f"Downloaded {output_path} from Google Drive.")
 
-tuple_shapes = [
-        [(0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1)],
-        [(0, 1), (0, 2), (0, 3), (1, 3), (2, 3), (2, 2)],
-        [(1, 0), (1, 1), (1, 2), (2, 2), (3, 2), (3, 1)],
-        [(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 2)],
-        [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2), (1, 2)],
-        [(0, 1), (1, 1), (2, 1), (2, 2), (2, 3), (1, 3)],
-        [(1, 0), (2, 0), (3, 0), (3, 1), (3, 2), (2, 2)],
-        [(1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (2, 3)],
-        #straight rows
-        [(0, 0), (1, 0), (2, 0), (3, 0)],
-        [(0, 1), (1, 1), (2, 1), (3, 1)],
-    ]
-approximator = SymmetricNTupleNetwork(tuple_shapes=tuple_shapes)
-approximator.load("weights_compatible.pkl")
+# tuple_shapes = [
+#         [(0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1)],
+#         [(0, 1), (0, 2), (0, 3), (1, 3), (2, 3), (2, 2)],
+#         [(1, 0), (1, 1), (1, 2), (2, 2), (3, 2), (3, 1)],
+#         [(1, 1), (1, 2), (1, 3), (2, 3), (3, 3), (3, 2)],
+#         [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2), (1, 2)],
+#         [(0, 1), (1, 1), (2, 1), (2, 2), (2, 3), (1, 3)],
+#         [(1, 0), (2, 0), (3, 0), (3, 1), (3, 2), (2, 2)],
+#         [(1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (2, 3)],
+#     ]
+approximator = SymmetricNTupleNetwork()
+print("start_log")
+approximator.load("converted_weights.pkl")
     
 def get_action(state, score):
     global approximator
-    print("moved")
     env = Game2048Env()
     env.board = state.copy()
     env.score = score
-    td_mcts = TreeSearch(env, approximator, iterations=50)
-    root = DecisionNode(state, score, env=env)
+    td_mcts = TemporalMCTS(env, approximator, num_iterations=50)
+    root = BaseNode(state, score, environment=env)
 
     legal_moves = [a for a in range(4) if env.is_move_legal(a)]
     if not legal_moves:
         return 
     
-    for _ in range(td_mcts.iterations):
-        td_mcts.run_simulation(root)
+    for _ in range(td_mcts.num_iterations):
+        td_mcts.execute_simulation(root)
 
     best_action, distribution = td_mcts.best_action_distribution(root)
     return best_action # Choose a random action
 
-class DecisionNode:
-    def __init__(self, state, score, parent=None, action=None, env=None):
-        self.state = state
-        self.score = score
-        self.parent = parent
-        self.action = action
-        self.children = {}  # action -> RandomNode
-        self.visits = 0
-        self.total_reward = 0.0
-        self.legal_actions = {}  # action -> (afterstate, after_score)
-        if env is not None:
-            for a in range(4):
-                sim = copy.deepcopy(env)
-                sim.board = state.copy()
-                sim.score = score
-                board, new_score, done, _ = sim.step(a, generate=False)
-                if not np.array_equal(state, board):
-                    self.legal_actions[a] = (board, new_score)
-        
-        self.untried_actions = list(self.legal_actions.keys())
+import random
+import copy
+import math
+import numpy as np
 
-    def fully_expanded(self):
-        if not self.legal_actions:
+class BaseNode:
+    def __init__(self, board_state, current_score, parent_node=None, action_taken=None, environment=None):
+        self.board_state = board_state
+        self.current_score = current_score
+        self.parent_node = parent_node
+        self.action_taken = action_taken
+        self.children_nodes = {}  # action -> Node
+        self.visitation_count = 0
+        self.accumulated_reward = 0.0
+        self.available_actions = {}  # action -> (next_board_state, next_score)
+        
+        if environment is not None:
+            for move in range(4):  # 4 possible moves (0, 1, 2, 3)
+                simulated_env = copy.deepcopy(environment)
+                simulated_env.board = board_state.copy()
+                simulated_env.score = current_score
+                board_after_move, new_score, is_done, _ = simulated_env.step(move, generate=False)
+                if not np.array_equal(board_state, board_after_move):
+                    self.available_actions[move] = (board_after_move, new_score)
+
+        self.pending_actions = list(self.available_actions.keys())
+
+    def is_completely_expanded(self):
+        if not self.available_actions:
             return False
-        return all(action in self.children for action in self.legal_actions)
-        
-    def is_leaf(self):
-        return not self.fully_expanded()
+        return all(action in self.children_nodes for action in self.available_actions)
 
-class RandomNode:
-    def __init__(self, state, score, parent, action):
-        self.state = state
-        self.score = score
-        self.parent = parent
-        self.action = action
-        self.children = {}  # (pos, val) -> DecisionNode
-        self.visits = 0
-        self.total_reward = 0.0
-        self.expanded = False  
+    def is_leaf_node(self):
+        return not self.is_completely_expanded()
 
-    def is_leaf(self):
-        return not self.expanded
-    
-    def fully_expanded(self, empty_tiles):
-        return len(self.children) == len(empty_tiles) * 2  # For 2 and 4
+class DecisionNode:
+    def __init__(self, board_state, current_score, parent_node, action_taken):
+        self.board_state = board_state
+        self.current_score = current_score
+        self.parent_node = parent_node
+        self.action_taken = action_taken
+        self.children_nodes = {}  # (position, value) -> DecisionNode
+        self.visitation_count = 0
+        self.accumulated_reward = 0.0
+        self.is_expanded = False
 
-# Main search algorithm
-class TreeSearch:
-    def __init__(self, env, approximator, iterations=50, exploration_constant=0.0, rollout_depth=10, gamma=1):
-        self.env = env
-        self.iterations = iterations
-        self.c = exploration_constant
+    def is_leaf_node(self):
+        return not self.is_expanded
+
+    def is_fully_expanded(self, empty_positions):
+        return len(self.children_nodes) == len(empty_positions) * 2  # Considering 2 and 4
+
+# Main algorithm for the search
+class TemporalMCTS:
+    def __init__(self, game_env, value_predictor, num_iterations=50, exploration_factor=0.0, rollout_depth=10, discount_factor=1):
+        self.game_env = game_env
+        self.num_iterations = num_iterations
+        self.exploration_factor = exploration_factor
         self.rollout_depth = rollout_depth
-        self.gamma = gamma
+        self.discount_factor = discount_factor
         
-        self.approximator = approximator
-        self.min_value_seen = float('inf')
-        self.max_value_seen = float('-inf')
+        self.value_predictor = value_predictor
+        self.min_score_encountered = float('inf')
+        self.max_score_encountered = float('-inf')
 
-    def create_env_from_state(self, state, score):
+    def generate_env_from_state(self, board_state, current_score):
         """
-        Creates a deep copy of the environment with a given board state and score.
+        Create a deep copy of the environment with a given board state and score.
         """
-        new_env = copy.deepcopy(self.env)
-        new_env.board = state.copy()
-        new_env.score = score
-        return new_env
-    
-    def evaluate_best_afterstate_value(self, sim_env, approximator):
-        temp_node = DecisionNode(sim_env.board.copy(), sim_env.score, env=sim_env)
-        if not temp_node.legal_actions:
+        simulated_env = copy.deepcopy(self.game_env)
+        simulated_env.board = board_state.copy()
+        simulated_env.score = current_score
+        return simulated_env
+
+    def evaluate_optimal_after_move_value(self, simulated_env, value_predictor):
+        simulated_root_node = BaseNode(simulated_env.board.copy(), simulated_env.score, environment=simulated_env)
+        if not simulated_root_node.available_actions:
             return 0
         
-        max_value = float('-inf')
-        for a, (board, new_score) in temp_node.legal_actions.items():
-            reward = new_score - sim_env.score
-            v = reward + approximator.value(board)
-            max_value = max(max_value, v)
-        return max_value
-    
-    def select_child(self, node):
-        # Select child using UCB formula
-        best_ucb_score = -float("inf")
-        best_child = None
-        best_action = None
-        for action, child in node.children.items():
-            if child.visits == 0:
-                ucb_score = self.approximator.value(child.state)
+        best_value = float('-inf')
+        for move, (board_after_move, new_score) in simulated_root_node.available_actions.items():
+            move_reward = new_score - simulated_env.score
+            estimated_value = move_reward + value_predictor.value(board_after_move)
+            best_value = max(best_value, estimated_value)
+        return best_value
+
+    def select_best_child(self, node):
+        # Select the best child using UCB (Upper Confidence Bound) formula
+        best_ucb_value = -float("inf")
+        best_child_node = None
+        best_move = None
+        for move, child_node in node.children_nodes.items():
+            if child_node.visitation_count == 0:
+                ucb_value = self.value_predictor.value(child_node.board_state)
             else:
-                avg_reward = child.total_reward / child.visits
-                exploration = self.c * math.sqrt(math.log(node.visits) / child.visits)
-                ucb_score = avg_reward + exploration
-            if ucb_score > best_ucb_score:
-                best_child = child
-                best_action = action
-                best_ucb_score = ucb_score
-        return best_action, best_child
-    
-    def select(self, root):
-        node = root
-        sim_env = self.create_env_from_state(node.state, node.score)
-        r_sum = 0
-        while not node.is_leaf():
+                average_reward = child_node.accumulated_reward / child_node.visitation_count
+                exploration_bonus = self.exploration_factor * math.sqrt(math.log(node.visitation_count) / child_node.visitation_count)
+                ucb_value = average_reward + exploration_bonus
+            if ucb_value > best_ucb_value:
+                best_child_node = child_node
+                best_move = move
+                best_ucb_value = ucb_value
+        return best_move, best_child_node
 
-            if isinstance(node, DecisionNode):
-                action, _ = self.select_child(node)
-                prev_score = sim_env.score
-                _, new_score, done, _ = sim_env.step(action, generate=False)
-                reward = new_score - prev_score
-                r_sum += reward
+    def traverse(self, root_node):
+        current_node = root_node
+        simulated_env = self.generate_env_from_state(current_node.board_state, current_node.current_score)
+        total_reward = 0
+        while not current_node.is_leaf_node():
 
-                if action not in node.children:
-                    node.children[action] = RandomNode(sim_env.board.copy(), new_score, parent=node, action=action)
-                node = node.children[action]
+            if isinstance(current_node, BaseNode):
+                best_move, _ = self.select_best_child(current_node)
+                previous_score = simulated_env.score
+                _, new_score, done, _ = simulated_env.step(best_move, generate=False)
+                move_reward = new_score - previous_score
+                total_reward += move_reward
 
-            elif isinstance(node, RandomNode):
-                keys = list(node.children.keys())  # key: (pos, val)
-                weights = [0.9 if val == 2 else 0.1 for (_, val) in keys]
-                sampled_key = random.choices(keys, weights=weights, k=1)[0]
+                if best_move not in current_node.children_nodes:
+                    current_node.children_nodes[best_move] = DecisionNode(simulated_env.board.copy(), new_score, parent_node=current_node, action_taken=best_move)
+                current_node = current_node.children_nodes[best_move]
 
-                node = node.children[sampled_key]
-                sim_env = self.create_env_from_state(node.state, node.score)
-        return node, sim_env, r_sum
-    
-    def expand(self, node, sim_env):
-        if sim_env.is_game_over():
-            return node, sim_env
+            elif isinstance(current_node, DecisionNode):
+                possible_keys = list(current_node.children_nodes.keys())  # key: (position, value)
+                action_weights = [0.9 if value == 2 else 0.1 for (_, value) in possible_keys]
+                selected_key = random.choices(possible_keys, weights=action_weights, k=1)[0]
 
-        if isinstance(node, DecisionNode) and not node.children:
-            for action, (board, new_score) in node.legal_actions.items():
-                random_node = RandomNode(board.copy(), new_score, parent=node, action=action)
-                node.children[action] = random_node
-  
-        elif isinstance(node, RandomNode) and not node.expanded:
-            self.expand_random_node(node)
+                current_node = current_node.children_nodes[selected_key]
+                simulated_env = self.generate_env_from_state(current_node.board_state, current_node.current_score)
 
-    def rollout(self, node, sim_env, r_sum):
+        return current_node, simulated_env, total_reward
+
+    def expand_node(self, node, simulated_env):
+        if simulated_env.is_game_over():
+            return node, simulated_env
+
+        if isinstance(node, BaseNode) and not node.children_nodes:
+            for move, (board_after_move, new_score) in node.available_actions.items():
+                random_decision_node = DecisionNode(board_after_move.copy(), new_score, parent_node=node, action_taken=move)
+                node.children_nodes[move] = random_decision_node
+
+        elif isinstance(node, DecisionNode) and not node.is_expanded:
+            self.expand_random_decision_node(node)
+
+    def simulate_rollout(self, node, simulated_env, total_reward):
         """
-        Estimate node value using the approximator
+        Estimate the value of a node using the value_predictor
         """
-        if isinstance(node, DecisionNode):
-            value = self.evaluate_best_afterstate_value(sim_env, self.approximator)
-        elif isinstance(node, RandomNode):
-            value = self.approximator.value(node.state)
+        if isinstance(node, BaseNode):
+            estimated_value = self.evaluate_optimal_after_move_value(simulated_env, self.value_predictor)
+        elif isinstance(node, DecisionNode):
+            estimated_value = self.value_predictor.value(node.board_state)
         else:
-            value = 0
+            estimated_value = 0
 
-        value = r_sum + value
+        estimated_value = total_reward + estimated_value
         # Normalize values
-        if self.c != 0:
-            self.min_value_seen = min(self.min_value_seen, value)
-            self.max_value_seen = max(self.max_value_seen, value)
-            if self.max_value_seen == self.min_value_seen:
-                normalized_return = 0.0
+        if self.exploration_factor != 0:
+            self.min_score_encountered = min(self.min_score_encountered, estimated_value)
+            self.max_score_encountered = max(self.max_score_encountered, estimated_value)
+            if self.max_score_encountered == self.min_score_encountered:
+                normalized_value = 0.0
             else:
-                normalized_return = 2 * (value - self.min_value_seen) / (self.max_value_seen - self.min_value_seen) - 1
+                normalized_value = 2 * (estimated_value - self.min_score_encountered) / (self.max_score_encountered - self.min_score_encountered) - 1
         else:
-            normalized_return = value
+            normalized_value = estimated_value
 
-        return normalized_return
+        return normalized_value
 
-    def backpropagate(self, node, reward):
-        # Update stats throughout the tree
+    def propagate_backwards(self, node, reward):
+        # Update statistics through the tree from the node upwards
         while node is not None:
-            node.visits += 1
-            node.total_reward += reward
-            node = node.parent
+            node.visitation_count += 1
+            node.accumulated_reward += reward
+            node = node.parent_node
 
-    def expand_random_node(self, node):
-        empty_tiles = list(zip(*np.where(node.state == 0)))
+    def expand_random_decision_node(self, node):
+        available_positions = list(zip(*np.where(node.board_state == 0)))
 
-        for pos in empty_tiles:
-            for val in [2, 4]:
-                new_state = node.state.copy()
-                new_state[pos] = val
-                key = (pos, val)
-                if key not in node.children:
-                    child = DecisionNode(new_state, node.score, parent=node, action=key, env=self.env)
-                    node.children[key] = child
+        for position in available_positions:
+            for value in [2, 4]:
+                new_board_state = node.board_state.copy()
+                new_board_state[position] = value
+                key = (position, value)
+                if key not in node.children_nodes:
+                    random_node = BaseNode(new_board_state, node.current_score, parent_node=node, action_taken=key, environment=self.game_env)
+                    node.children_nodes[key] = random_node
 
-        node.expanded = True
-        
-    def run_simulation(self, root):
+        node.is_expanded = True
+
+    def execute_simulation(self, root_node):
         # Selection
-        node, sim_env, r_sum = self.select(root)
+        selected_node, simulated_env, total_reward = self.traverse(root_node)
 
         # Expansion
-        self.expand(node, sim_env)
+        self.expand_node(selected_node, simulated_env)
 
         # Rollout
-        reward = self.rollout(node, sim_env, r_sum)
+        reward = self.simulate_rollout(selected_node, simulated_env, total_reward)
 
         # Backpropagation
-        self.backpropagate(node, reward)
+        self.propagate_backwards(selected_node, reward)
 
-    def best_action_distribution(self, root):
-        '''
+    def best_action_distribution(self, root_node):
+        """
         Computes the visit count distribution for each action at the root node.
-        '''
-        total_visits = sum(child.visits for child in root.children.values())
-        distribution = np.zeros(4)
-        best_visits = -1
-        best_action = None
-        for action, child in root.children.items():
-            distribution[action] = child.visits / total_visits if total_visits > 0 else 0
-            if child.visits > best_visits:
-                best_visits = child.visits
-                best_action = action
-        return best_action, distribution
+        """
+        total_visits = sum(child.visitation_count for child in root_node.children_nodes.values())
+        visit_distribution = np.zeros(4)
+        highest_visits = -1
+        best_move = None
+        for move, child_node in root_node.children_nodes.items():
+            visit_distribution[move] = child_node.visitation_count / total_visits if total_visits > 0 else 0
+            if child_node.visitation_count > highest_visits:
+                highest_visits = child_node.visitation_count
+                best_move = move
+        return best_move, visit_distribution
+
 
 def play_game():
     env = Game2048Env()
