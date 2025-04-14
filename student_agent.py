@@ -335,12 +335,14 @@ def get_action(state, score):
     print("1")
     global approximator
     def init_model():
+        global approximator
         if approximator is None:
             gc.collect()
             approximator = SymmetricNTupleNetwork()
             print("load model")
             approximator.load("converted_weights.pkl")
             print("load model done")
+    init_model()
     env = Game2048Env()
     env.board = state.copy()
     env.score = score
