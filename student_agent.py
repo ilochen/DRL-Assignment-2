@@ -310,12 +310,12 @@ class SymmetricNTupleNetwork:
 import os
 # https://drive.google.com/file/d/1stLf9NqvkkmUTqvPe9dSREO0KfMAlN0s/view?usp=sharing
 # Download the file only if not already downloaded
-file_id = "1stLf9NqvkkmUTqvPe9dSREO0KfMAlN0s"
-output_path = "ntuple_network.pkl"
+# file_id = "1stLf9NqvkkmUTqvPe9dSREO0KfMAlN0s"
+# output_path = "ntuple_network.pkl"
 
-if not os.path.exists(output_path):
-    gdown.download(f"https://drive.google.com/uc?id={file_id}", output_path, quiet=False)
-    print(f"Downloaded {output_path} from Google Drive.")
+# if not os.path.exists(output_path):
+#     gdown.download(f"https://drive.google.com/uc?id={file_id}", output_path, quiet=False)
+#     print(f"Downloaded {output_path} from Google Drive.")
 
 tuple_shapes = [
         [(0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1)],
@@ -331,7 +331,7 @@ tuple_shapes = [
         [(0, 1), (1, 1), (2, 1), (3, 1)],
     ]
 approximator = SymmetricNTupleNetwork(tuple_shapes=tuple_shapes)
-approximator.load(output_path)
+approximator.load("./weights_compatible.pkl")
     
 def get_action(state, score):
     print("moved")
