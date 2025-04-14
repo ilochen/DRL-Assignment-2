@@ -335,11 +335,12 @@ print("start_log")
 approximator.load("converted_weights.pkl")
     
 def get_action(state, score):
+    print("1")
     global approximator
     env = Game2048Env()
     env.board = state.copy()
     env.score = score
-    td_mcts = TemporalMCTS(env, approximator, num_iterations=50)
+    td_mcts = TemporalMCTS(env, approximator, num_iterations=15)
     root = BaseNode(state, score, environment=env)
 
     legal_moves = [a for a in range(4) if env.is_move_legal(a)]
@@ -586,4 +587,3 @@ def play_game():
 
 if __name__ == "__main__":
     play_game()
-    
