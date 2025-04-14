@@ -333,6 +333,7 @@ approximator = SymmetricNTupleNetwork(tuple_shapes=tuple_shapes)
 approximator.load(output_path)
     
 def get_action(state, score):
+    print("moved")
     env = Game2048Env()
     env.board = state.copy()
     env.score = score
