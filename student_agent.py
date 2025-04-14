@@ -298,6 +298,7 @@ class SymmetricNTupleNetwork:
 
     def load(self, path):
         with open(path, 'rb') as f:
+            print("start_load")
             self.tuple_shapes, self.num_values, saved_luts = pickle.load(f)
             print("tuple_shapes:", self.tuple_shapes)
             print("num_values:", self.num_values)
