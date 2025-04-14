@@ -331,9 +331,10 @@ tuple_shapes = [
         [(0, 1), (1, 1), (2, 1), (3, 1)],
     ]
 approximator = SymmetricNTupleNetwork(tuple_shapes=tuple_shapes)
-approximator.load("./weights_compatible.pkl")
+approximator.load("weights_compatible.pkl")
     
 def get_action(state, score):
+    global approximator
     print("moved")
     env = Game2048Env()
     env.board = state.copy()
