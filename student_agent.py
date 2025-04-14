@@ -299,16 +299,19 @@ class SymmetricNTupleNetwork:
     def load(self, path):
         with open(path, 'rb') as f:
             self.tuple_shapes, self.num_values, saved_luts = pickle.load(f)
+            # print("tuple_shapes:", self.tuple_shapes)
+            # print("num_values:", self.num_values)
+            # print("saved_luts:", saved_luts)
             self.symmetry_tuples = self._generate_all_symmetric_tuples(self.tuple_shapes)
             self.luts = [defaultdict(float, lut) for lut in saved_luts]
 
 
 
 import os
-#https://drive.google.com/file/d/1stLf9NqvkkmUTqvPe9dSREO0KfMAlN0s/view?usp=sharing
+# https://drive.google.com/file/d/1stLf9NqvkkmUTqvPe9dSREO0KfMAlN0s/view?usp=sharing
 # Download the file only if not already downloaded
-file_id = "1cCm3PrTdruUPzl7MsTudDHAvFSKlmhV4"
-output_path = "ntuple_network_55299.pkl"
+file_id = "1stLf9NqvkkmUTqvPe9dSREO0KfMAlN0s"
+output_path = "ntuple_network.pkl"
 
 if not os.path.exists(output_path):
     gdown.download(f"https://drive.google.com/uc?id={file_id}", output_path, quiet=False)
@@ -327,7 +330,7 @@ tuple_shapes = [
         [(0, 1), (1, 1), (2, 1), (3, 1)],
     ]
 approximator = SymmetricNTupleNetwork(tuple_shapes=tuple_shapes)
-approximator.load("./ntuple_network_55299.pkl")
+approximator.load(output_path)
     
 def get_action(state, score):
     env = Game2048Env()
