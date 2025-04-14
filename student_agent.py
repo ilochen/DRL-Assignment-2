@@ -315,6 +315,7 @@ output_path = "ntuple_network.pkl"
 
 if not os.path.exists(output_path):
     gdown.download(f"https://drive.google.com/uc?id={file_id}", output_path, quiet=False)
+    print(f"Downloaded {output_path} from Google Drive.")
 
 tuple_shapes = [
         [(0, 0), (0, 1), (0, 2), (1, 2), (2, 2), (2, 1)],
