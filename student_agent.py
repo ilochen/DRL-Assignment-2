@@ -305,7 +305,7 @@ class SymmetricNTupleNetwork:
 
 
 import os
-
+#https://drive.google.com/file/d/1stLf9NqvkkmUTqvPe9dSREO0KfMAlN0s/view?usp=sharing
 # Download the file only if not already downloaded
 file_id = "1cCm3PrTdruUPzl7MsTudDHAvFSKlmhV4"
 output_path = "ntuple_network_55299.pkl"
