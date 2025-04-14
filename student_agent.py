@@ -299,8 +299,8 @@ class SymmetricNTupleNetwork:
     def load(self, path):
         with open(path, 'rb') as f:
             self.tuple_shapes, self.num_values, saved_luts = pickle.load(f)
-            # print("tuple_shapes:", self.tuple_shapes)
-            # print("num_values:", self.num_values)
+            print("tuple_shapes:", self.tuple_shapes)
+            print("num_values:", self.num_values)
             # print("saved_luts:", saved_luts)
             self.symmetry_tuples = self._generate_all_symmetric_tuples(self.tuple_shapes)
             self.luts = [defaultdict(float, lut) for lut in saved_luts]
